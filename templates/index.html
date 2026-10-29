@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Deadline Rescue Planner</title>
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+<body>
+    <header class="topbar">
+        <a href="/" class="brand">Rescue<span>Planner</span></a>
+        <span class="header-note">Plan smarter. Finish on time.</span>
+    </header>
+
+    <main class="container">
+        <section class="hero">
+            <p class="eyebrow">YOUR PERSONAL STUDY ASSISTANT</p>
+            <h1>Take control of your deadlines.</h1>
+            <p>Turn your workload into a realistic study plan, one task at a time.</p>
+            <a class="primary-button" href="#add-task">Create a task</a>
+        </section>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="messages">
+                    {% for category, message in messages %}
+                        <div class="message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <section class="stats">
+            <article class="stat-card">
+                <p>Total tasks</p>
+                <h2>{{ total }}</h2>
+                <span>Saved in your planner</span>
+            </article>
+
+            <article class="stat-card">
+                <p>Study time needed</p>
+                <h2>{{ remaining_hours }} <small>hrs</small></h2>
+                <span>For unfinished tasks</span>
+            </article>
+
+            <article class="stat-card">
+                <p>Today's study time</p>
+                <h2>{{ today_used }} <small>/ {{ available_hours }} hrs</small></h2>
+                <span>{{ today_remaining }} hours available today</span>
+            </article>
+
+            <article class="stat-card">
+                <p>Tasks completed</p>
+                <h2>{{ completed_count }} <small>/ {{ total }}</small></h2>
+                <div class="progress-track">
+                    <div
+                        id="progress-fill"
+                        class="progress-fill"
+                        data-progress="{{ progress }}"
+                    ></div>
+                </div>
+                <span>{{ progress }}% completion</span>
+            </article>
+        </section>
+
+        <section class="section-heading" id="add-task">
+            <div>
+                <p class="eyebrow">GET ORGANIZED</p>
+                <h2>Add a new task</h2>
+                <p>Enter your deadline and the time you need to finish.</p>
+            </div>
+        </section>
+
+        <section class="panel">
+            <form method="POST" action="{{ url_for('index') }}" class="task-form">
+                <input type="hidden" name="action" value="add">
+
+                <div class="form-field">
+                    <label for="title">Task title</label>
+                    <input id="title" name="title" type="text"
+                           placeholder="e.g. DBMS Assignment" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="subject">Subject</label>
+                    <input id="subject" name="subject" type="text"
+                           placeholder="e.g. DBMS" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="deadline">Deadline</label>
+                    <input id="deadline" name="deadline"
+                           type="datetime-local" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="hours">Estimated study hours</label>
+                    <input id="hours" name="hours" type="number"
+                           min="0.25" max="1000" step="0.25"
+                           placeholder="2" required>
+                </div>
+
+                <div class="form-field">
+                    <label for="importance">Importance</label>
+                    <select id="importance" name="importance" required>
+                        <option value="5">5 - Very important</option>
+                        <option value="4">4 - Important</option>
+                        <option value="3" selected>3 - Normal</option>
+                        <option value="2">2 - Low</option>
+                        <option value="1">1 - Lowest</option>
+                    </select>
+                </div>
+
+                <button class="primary-button submit-button" type="submit">
+                    + Add and save task
+                </button>
+            </form>
+        </section>
+
+        <section class="section-heading">
+            <div>
+                <p class="eyebrow">YOUR ACTION PLAN</p>
+                <h2>Today's priorities</h2>
+                <p>{{ today_display }} · Up to {{ available_hours }} study hours</p>
+            </div>
+        </section>
+
+        <section class="panel">
+            {% if plan %}
+                <div class="plan-list">
+                    {% for task in plan %}
+                        <article class="plan-item">
+                            <div class="plan-content">
+                                <span class="status {{ task.status_class }}">
+                                    {{ task.status }}
+                                </span>
+                                <h3>{{ task.title }}</h3>
+                                <p>{{ task.subject }} · Due {{ task.deadline_display }}</p>
+                            </div>
+                            <strong>{{ task.hours }} hrs</strong>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>No tasks scheduled for today yet</h3>
+                    <p>Add tasks above to let the planning agent build your plan.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="section-heading">
+            <div>
+                <h2>Upcoming study plan</h2>
+                <p>Tasks allocated to future days within your available study time.</p>
+            </div>
+        </section>
+
+        <section class="panel">
+            {% if future_plan %}
+                {% for task in future_plan %}
+                    <article class="plan-item">
+                        <div class="plan-content">
+                            <h3>{{ task.title }}</h3>
+                            <p>{{ task.subject }} · Due {{ task.deadline_display }}</p>
+                            <span class="status upcoming">{{ task.plan_status }}</span>
+                        </div>
+                        <strong>{{ task.hours }} hrs</strong>
+                    </article>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    No future tasks have been scheduled.
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="section-heading">
+            <div>
+                <h2>Needs rescheduling</h2>
+                <p>Overdue tasks or tasks that do not fit before their deadlines.</p>
+            </div>
+        </section>
+
+        <section class="panel">
+            {% if reschedule %}
+                {% for task in reschedule %}
+                    <article class="plan-item">
+                        <div class="plan-content">
+                            <span class="status urgent">{{ task.status }}</span>
+                            <h3>{{ task.title }}</h3>
+                            <p>{{ task.subject }} · Due {{ task.deadline_display }}</p>
+                        </div>
+                        <strong>{{ task.hours }} hrs</strong>
+                    </article>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    Great! No tasks currently need rescheduling.
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="section-heading">
+            <div>
+                <h2>All tasks</h2>
+                <p>Manage your saved tasks and update their progress.</p>
+            </div>
+        </section>
+
+        <section class="panel task-table-panel">
+            {% if tasks %}
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Task</th>
+                                <th>Deadline</th>
+                                <th>Time</th>
+                                <th>Importance</th>
+                                <th>Status</th>
+                                <th>Plan</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ task.title }}</strong>
+                                        <span class="table-subtitle">{{ task.subject }}</span>
+                                    </td>
+                                    <td>{{ task.deadline_display }}</td>
+                                    <td>{{ task.hours }} hrs</td>
+                                    <td>{{ task.importance }}/5</td>
+                                    <td>
+                                        <span class="status {{ task.status_class }}">
+                                            {{ task.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.plan_status }}</td>
+                                    <td>
+                                        <div class="actions">
+                                            <form method="POST" action="{{ url_for('index') }}">
+                                                <input type="hidden" name="action" value="toggle">
+                                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <button class="small-button" type="submit">
+                                                    {% if task.completed %}Undo{% else %}Complete{% endif %}
+                                                </button>
+                                            </form>
+
+                                            <form method="POST"
+                                                  action="{{ url_for('index') }}"
+                                                  onsubmit="return confirm('Delete this task?');">
+                                                <input type="hidden" name="action" value="delete">
+                                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <button class="small-button delete-button" type="submit">
+                                                    Delete
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>No tasks added yet</h3>
+                    <p>Create your first task to get started.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <footer>
+            <p>AI-Based Deadline Rescue Planner · Rule-based planning agent</p>
+            <p>Your tasks are stored locally in a SQLite database.</p>
+        </footer>
+    </main>
+
+    <script>
+        const progressBar = document.getElementById("progress-fill");
+
+        if (progressBar) {
+            const progress = Number(progressBar.dataset.progress);
+            const safeProgress = Number.isFinite(progress)
+                ? Math.max(0, Math.min(100, progress))
+                : 0;
+
+            progressBar.style.width = safeProgress + "%";
+        }
+    </script>
+</body>
+</html>
